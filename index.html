@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的摄影视界 | Gallery</title>
+    <style>
+        /* --- 1. 基础样式设计 (沿用原型) --- */
+        body {
+            background-color: #1a1a1a; /* 深色背景，突出照片 */
+            color: #fff;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* 顶部导航和后台上传区 */
+        header {
+            padding: 20px 40px;
+            background: #1e1e1e;
+            border-bottom: 1px solid #333;
+        }
+        h1 { font-size: 24px; font-weight: 300; letter-spacing: 2px; margin: 0;}
+        .upload-form { margin-top: 15px; display: flex; gap: 10px; align-items: center; }
+        input[type="file"], select, button[type="submit"] { padding: 8px; border: 1px solid #555; background: #333; color: white; border-radius: 4px;}
+        button[type="submit"] { background-color: #007bff; cursor: pointer; }
+
+        /* 分类过滤器 */
+        .filters {
+            padding: 30px 40px;
+            text-align: center;
+        }
+        .filter-btn {
+            background: none;
+            border: 1px solid #555;
+            color: #aaa;
+            padding: 8px 20px;
+            margin: 0 5px;
+            cursor: pointer;
+            transition: 0.3s;
+            text-decoration: none; /* 链接样式 */
+        }
+        .filter-btn:hover, .filter-btn.active {
+            border-color: #fff;
+            color: #fff;
+        }
+
+        /* --- 2. 核心功能：瀑布流布局 (Masonry) --- */
+        .gallery-container {
+            column-count: 4; /* 默认4列 */
+            column-gap: 15px;
+            padding: 20px 40px;
+        }
+
+        /* 响应式：手机端变1列，平板变2列 */
+        @media (max-width: 1000px) { .gallery-container { column-count: 2; } }
+        @media (max-width: 600px) { .gallery-container { column-count: 1; } }
+
+        /* 照片卡片容器 */
+        .photo-card {
+            background: #222;
+            margin-bottom: 15px;
+            break-inside: avoid;
+            position: relative;
+            overflow: hidden;
+            border-radius: 4px;
+            transition: transform 0.3s ease;
+        }
+        .photo-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+        }
+
+        /* 图片本体 */
+        .photo-card img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        /* --- 3. 水印与删除按钮 --- */
+        .watermark {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.7);
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+            pointer-events: none;
+            z-index: 10;
+        }
+        .delete-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            background: rgba(255, 0, 0, 0.8);
+            color: white;
+            padding: 2px 8px;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 14px;
+            z-index: 20;
+        }
+
+        /* --- 4. EXIF 信息展示 (悬停显示) --- */
+        .exif-info {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            color: #ccc;
+            padding: 10px;
+            font-size: 12px;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+            box-sizing: border-box;
+        }
+
+        .photo-card:hover .exif-info {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>MY PHOTOGRAPHY</h1>
+    <div class="upload-form">
+        <h3>上传作品 (管理界面):</h3>
+        <form action="/upload" method="post" enctype="multipart/form-data">
+            <input type="file" name="file" required>
+            <select name="category">
+                <option value="landscape">风光</option>
+                <option value="portrait">人像</option>
+                <option value="street">街拍</option>
+            </select>
+            <button type="submit">上传并处理</button>
+        </form>
+    </div>
+</header>
+
+<div class="filters">
+    <a href="/" class="filter-btn {% if not request.args.get('category') %}active{% endif %}">全部作品</a>
+    <a href="/?category=landscape" class="filter-btn {% if request.args.get('category') == 'landscape' %}active{% endif %}">风光 (Landscape)</a>
+    <a href="/?category=portrait" class="filter-btn {% if request.args.get('category') == 'portrait' %}active{% endif %}">人像 (Portrait)</a>
+    <a href="/?category=street" class="filter-btn {% if request.args.get('category') == 'street' %}active{% endif %}">街拍 (Street)</a>
+</div>
+
+<div class="gallery-container">
+
+    {% for photo in photos %}
+    <div class="photo-card">
+        <a href="{{ url_for('delete_photo', photo_id=photo[0]) }}" class="delete-btn" onclick="return confirm('确定要删除吗？')">×</a>
+
+        <img src="{{ url_for('static', filename='uploads/' + photo[1]) }}" alt="Photo ID: {{ photo[0] }}" loading="lazy">
+
+        <div class="watermark">{{ photo[2] | upper }} | {{ photo[3] }}</div>
+
+        <div class="exif-info">
+            {{ photo[4] }}
+        </div>
+    </div>
+    {% endfor %}
+
+    {% if not photos %}
+    <p style="text-align: center; grid-column: 1 / -1; color: #aaa;">这里还没有照片，请从上方上传第一张作品！</p>
+    {% endif %}
+
+</div>
+
+</body>
+</html>
